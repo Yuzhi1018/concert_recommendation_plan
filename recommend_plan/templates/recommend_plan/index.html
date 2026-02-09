@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Concert Plan Recommender</title>
+</head>
+<body>
+    <h1>Recommended City</h1>
+    <h2>{{ top_city}}</h2>
+
+    <h3>Why?</h3>
+    <p class="enter_budget">Enter your budget</p>
+    <form method="post" class="row g-3">
+        {% csrf_token %}
+        
+        <div class="col-md-6">
+          <label class="form-label">Artist name</label>
+          <input
+            type="text"
+            name="artist"
+            class="form-control"
+            placeholder="e.g. Taylor Swift"
+            required
+            >
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Budget ($)</label>
+          <input
+            type="number"
+            name="budget"
+            class="form-control"
+            value="400"
+            >
+        </div>
+
+        <div class="col-md-3 d-flex align-items-end">
+          <button type="submit" class="btn btn-primary w-100">
+            Recommend
+          </button>
+        </div>
+    </form>
+
+    <hr/>
+
+  {% if recommendation %}
+    <h2>Recommended City: {{ recommendation }}</h2>
+
+    <h3>Why?</h3>
+    <ul>
+        {% for r in reasons %}
+            <li>{{ r }}</li>
+        {% endfor %}
+    </ul>
+  {% else %}
+    <p>No recommendations yet. Try submitting a budget.</p>
+  {% endif %}
+  </body>
+</html>
