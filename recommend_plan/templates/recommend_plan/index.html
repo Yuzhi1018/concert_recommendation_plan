@@ -5,7 +5,7 @@
 </head>
 <body>
     <h1>Recommended City</h1>
-    <h2>{{ top_city}}</h2>
+    <h2>{{top_city}}</h2>
 
     <h3>Why?</h3>
     <p class="enter_budget">Enter your budget</p>
@@ -29,10 +29,33 @@
             type="number"
             name="budget"
             class="form-control"
-            value="400"
+            value="{{ budget }}"
             >
         </div>
 
+        <div class="col-md-3">
+          <label class="form-label">Estimated investment hours (h)</label>
+          <input
+            type="number"
+            name="time_budget_hours"
+            step="0.5"
+            class="form-control"
+            value="{{time_budget_hours}}"
+            placeholder="Max hours you can spend (e.g., 4)"
+            >
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Your city</label>
+          <input
+            type="text"
+            name="user_city"
+            class="form-control"
+            placeholder="e.g. Santa Barbara"
+            value="{{ user_city }}"
+            required
+            >
+        </div>
         <div class="col-md-3 d-flex align-items-end">
           <button type="submit" class="btn btn-primary w-100">
             Recommend
@@ -42,17 +65,51 @@
 
     <hr/>
 
-  {% if recommendation %}
-    <h2>Recommended City: {{ recommendation }}</h2>
+    <div class="row">
+      {% if no_recent_tour %}
+        <div style="margin: 20px 0; padding: 12px; border: 1px solid #ccc;">
+          <strong>No recent tour plans found.</strong><br>
+          We couldn't find any official upcoming concerts for
+          <em>{{ artist }}</em>.
+          <br>
+          Try another artist, or check back later.
+        </div>
 
-    <h3>Why?</h3>
-    <ul>
-        {% for r in reasons %}
-            <li>{{ r }}</li>
-        {% endfor %}
-    </ul>
+      {% elif result %}
+        {% for item in result %}
+          <div class="col-12" style="margin-bottom: 24px;">
+             <h3>{{ item.event.event_name }}</h3>
+
+             {% if item.event.poster_url %}
+              <img
+                src="{{ item.event.poster_url}}"
+                alt="concert poster"
+                style="width:200px; height:auto; margin-bottom:12px;"
+              >
+              {% endif %}
+
+             <p>Score:</strong>{{ item.score|floatformat:2 }}</p>
+             <p>City:</strong>{{ item.event.city }}</p>
+
+             {% if item.event.date %}
+              <p><strong>Date:</strong> {{ item.event.date}}</p>
+             {% endif %}
+
+             <h4>Reasons</h4>
+             <ul>
+              {% for r in item.reasons %}
+                <li>{{ r }}</li>
+              {% endfor %}
+             </ul>
+
+            {% if item.event.ticketmaster_url %}
+              <a href="{{ item.event.ticketmaster_url }}" target="_blank">View on Ticketmaster</a>
+            {% endif %}
+        </div>
+    {% endfor %}
   {% else %}
-    <p>No recommendations yet. Try submitting a budget.</p>
+        <p>No results yet. Try searching an artist.</p>
   {% endif %}
-  </body>
+  </div>
+</body>
 </html>

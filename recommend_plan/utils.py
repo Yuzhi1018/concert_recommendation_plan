@@ -1,10 +1,10 @@
 default_weights={
-    'time_score'  : 0.10,
-    'travel_score'  : 0.20,
-    'money_score' : 0.20,
-    'security_score': 0.10,
-    'affection_score' : 0.30,
-    'rarity_score' : 0.10,
+    'time_score'  : 1,
+    'travel_score'  : 2,
+    'money_score' : 2,
+    'security_score': 1,
+    'affection_score' : 3,
+    'rarity_score' : 1,
 }
 
 templates={
@@ -16,18 +16,33 @@ templates={
     "rarity_score": "This is a relatively rare opportunity",
 }
 
+def time_score(event, time_budget_hours: float):
+    total = (event.get('travel_hours') or 0) + (event.get('event_duration_hours') or 0)
 
-def compute_score(event, budget=400):
+    if time_budget_hours<=0:
+        return 0
+    
+    if total<= time_budget_hours:
+        return 1
+    
+    over = total-time_budget_hours
+    return max(0, 1 - over / time_budget_hours)
+
+def compute_components(event, budget, time_budget_hours):
     if isinstance(event, list):
         event =event[0]
 
-    if (budget >= event['money']):
-        money_score = 1
+    price = event.get('money')
+
+    if price is None:
+        money_score = 0.5
+    elif budget >= price:
+        money_score = 1.0
     else:
-        money_score = max(0, 1 - (event['money'] - budget) / budget)
+        money_score = max(0.0, 1.0 - (price - budget) / budget)
 
     scores={
-        'time_score': event['time'] / 10,
+        'time_score': time_score(event, time_budget_hours),
 
         'travel_score': max(0, 1 - event['travel_hours'] / 10),
 
@@ -40,32 +55,36 @@ def compute_score(event, budget=400):
         'rarity_score' : 1 / (1 + event['frequency_of_holding_concerts']),
     }
 
-    total_score = sum(default_weights[k]*scores[k] for k in scores)
+    return scores
 
-    return total_score, scores
-
-def explain_event(event, budget=400, weights=None, top_n=2):
+def compute_score(event, budget=400, weights=None, time_budget_hours= 8.0):
     if weights is None:
         weights = default_weights
     
-    total, scores = compute_score(event, budget=budget)
+    scores= compute_components(event, budget=budget, time_budget_hours=time_budget_hours)
+
+    total_score = sum(weights[k]*scores[k] for k in scores)
+
+    return total_score
+
+def explain_event(event, budget=400, weights=None, top_n=2, time_budget_hours=8.0):
+    if weights is None:
+        weights = default_weights
+    
+    scores = compute_components(event, budget=budget, time_budget_hours=time_budget_hours)
     contributions = {k: weights.get(k,0) * scores[k] for k in scores}
 
     top_factors = sorted(contributions.items(), key=lambda x: x[1], reverse=True)[:top_n]
     return [templates.get(k,k) for k, _ in top_factors]
 
-def rank_events(events, budget=400, weights=None, k=2):
+def rank_events(events, budget=400, time_budget_hours= 8.0, weights=None, k=2):
     if weights is None:
         weights = default_weights
 
     if isinstance(events, dict):
         events = [events]
 
-    scored = []
-    for e in events:
-        total, _ = compute_score(e, budget=budget)
-        scored.append((e, total))
-
+    scored = [(e, compute_score(e, budget=budget, time_budget_hours=time_budget_hours, weights=weights)) for e in events]
     scored.sort(key=lambda x: x[1], reverse=True)
 
     result = []
@@ -73,6 +92,6 @@ def rank_events(events, budget=400, weights=None, k=2):
         result.append({
             "event": e,
             "score": total,
-            "reasons": explain_event(e, budget, weights, top_n=2)
+            "reasons": explain_event(e, budget=budget, weights=weights, top_n=2),
         })
     return result
