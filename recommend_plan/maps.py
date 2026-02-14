@@ -1,44 +1,42 @@
-import requests
-import os
+import os,requests
+from functools import lru_cache
 
 MAPBOX_TOKEN= os.getenv("MAPBOX_TOKEN")
 
-_CACHE = {}
+print("TOKEN:", MAPBOX_TOKEN)
 
-def get_travel_hours_cached(city_a: str, city_b: str) -> float:
-    if not city_a or not city_b:
-        return 0.0
-    
-    key = (city_a.strip().lower(), city_b.strip().lower())
-    if key in _CACHE:
-        return _CACHE[key]
-    
-    def geocode(city):
-        url= f"https://api.mapbox.com/geocoding/v5/mapbox.places/{city}.json"
-        params = {
-            "access_token": MAPBOX_TOKEN,
-            "limit": 1
-        }
-        r = requests.get(url, params=params, timeout=10).json()
-        if not r.get('features'):
-            raise ValueError(f'Cannot geocode city: {city}')
-        return r['features'] [0] ['center']
-    
-    lon1, lat1 = geocode(city_a)
-    lon2, lat2 = geocode(city_b)
+@lru_cache(maxsize=512)
+def geocode_city(city: str):
+    url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{city}.json"
+    params= {'access_token': MAPBOX_TOKEN, 'limit':1}
+    r = requests.get(url, params=params, timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    if not data.get('features'):
+        return None
+    lon, lat = data['features'][0]['center']
+    return lon, lat
 
-    url = f"https://api.mapbox.com/directions/v5/mapbox/driving/{lon1},{lat1};{lon2},{lat2}"
-    params = {"access_token": MAPBOX_TOKEN}
-    r = requests.get(url, params=params, timeout=10).json()
+@lru_cache(maxsize=2048)
+def get_travel_hours_mapbox(origin_city: str, dest_city: str, profile: str='driving'):
+    if not MAPBOX_TOKEN:
+        return None
 
-    routes = r.get('routes') or []
+    o = geocode_city(origin_city)
+    d = geocode_city(dest_city)
+    if not o or not d:
+        return None
+    
+    (olon, olat), (dlon, dlat) = o, d
+    url= f"https://api.mapbox.com/directions/v5/mapbox/{profile}/{olon},{olat};{dlon},{dlat}"
+    params = {'access_token': MAPBOX_TOKEN, 'overview': 'false'}
+    r = requests.get(url, params=params, timeout=10)
+    r.raise_for_status
+    data = r.json()
+
+    routes = data.get('routes') or []
     if not routes:
-        raise ValueError('No route found')
+         return None
     
     seconds = routes[0]['duration']
-    hours = seconds / 3600.0
-
-    _CACHE[key] = hours
-    return hours
-import os
-print("MAPBOX KEY:", os.getenv("MAPBOX_TOKEN"))
+    return seconds/ 3600.0

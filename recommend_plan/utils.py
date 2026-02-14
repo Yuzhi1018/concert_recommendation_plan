@@ -41,6 +41,8 @@ def compute_components(event, budget, time_budget_hours):
     else:
         money_score = max(0.0, 1.0 - (price - budget) / budget)
 
+    rarity_score = event.get('rarity_score', 0.5)
+
     scores={
         'time_score': time_score(event, time_budget_hours),
 
@@ -76,6 +78,13 @@ def explain_event(event, budget=400, weights=None, top_n=2, time_budget_hours=8.
 
     top_factors = sorted(contributions.items(), key=lambda x: x[1], reverse=True)[:top_n]
     return [templates.get(k,k) for k, _ in top_factors]
+    
+    if event.get('rarity_score', 0) >= 0.75:
+        n = event.get('city_event_count', None)
+    if n:
+        reasons.append(f"Rarity: Only {n} show(s) in {event['city']} for this tour.")
+    else:
+        reasons.append("Rarity: Limited shows in this city.")    
 
 def rank_events(events, budget=400, time_budget_hours= 8.0, weights=None, k=2):
     if weights is None:

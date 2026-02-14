@@ -5,8 +5,10 @@ from django.shortcuts import render
 from .utils import rank_events, compute_score, explain_event
 from django.http import JsonResponse
 from .importers import fetch_tm_events_by_keyword, tm_to_internal_event
+from .maps import get_travel_hours_mapbox
+from collections import Counter
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__)) #绝对路径
 DATA_PATH = os.path.join(BASE_DIR, "data", 'events.json')
 
 def index(request):
@@ -30,6 +32,12 @@ def index(request):
 
         user_city= (request.POST.get('user_city') or '').strip()
 
+        affection_raw = (request.POST.get('affection') or '7').strip()
+        
+        affection = int(affection_raw) if affection_raw.isdigit() else 7
+
+        affection_score = affection/10.0
+
         try:
             time_budget_hours=float(time_raw) if time_raw else 8.0
         except ValueError:
@@ -37,13 +45,23 @@ def index(request):
 
         tm_events = fetch_tm_events_by_keyword(artist)
 
-        events = [tm_to_internal_event(e) for e in tm_events]
+        events = [tm_to_internal_event(e, user_city) for e in tm_events]
 
-        from .maps import get_travel_hours_cached
+        city_counts = Counter(e.get('city') for e in events if e.get('city'))
+
+        for e in events:
+            n = city_counts.get(e.get('city'),1)
+            e['rarity_score'] = max(0.0, 1.0- (n-1)/4.0)
+            e['city_event_count'] = n
+            
+        scored = [(e, compute_score(e, budget=budget, time_budget_hours=time_budget_hours)) for e in events]
+
+        
+        from .maps import get_travel_hours_mapbox
 
         for e in events:
             try:
-                e['travel_hours'] = get_travel_hours_cached(user_city, e.get('city'))
+                e['travel_hours'] = get_travel_hours_mapbox(user_city, e.get('city'))
             except Exception:
                 e['travel_hours'] = 8.0
 
@@ -70,7 +88,7 @@ def index(request):
 
 def search_concerts(request):
     artist = request.GET.get('artist','')
-    API_KEY = os.getenv('K2M2PpHCgz61NMAUmV2ppgZ5pkgAJ7ra')
+    API_KEY = os.getenv('TICKETMASTER_API_KEY')
 
     url = "https://app.ticketmaster.com/discovery/v2/events.json?apikey=K2M2PpHCgz61NMAUmV2ppgZ5pkgAJ7ra&keyword=taylor%20swift&size=3"
     params = {
@@ -83,4 +101,3 @@ def search_concerts(request):
     data = r.json()
     
     return JsonResponse(data)
-
