@@ -1,3 +1,6 @@
+import json
+import os
+
 default_weights={
     'time_score'  : 1,
     'travel_score'  : 2,
@@ -104,3 +107,20 @@ def rank_events(events, budget=400, time_budget_hours= 8.0, weights=None, k=2):
             "reasons": explain_event(e, budget=budget, weights=weights, top_n=2),
         })
     return result
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SECURITY_PATH = os.path.join(BASE_DIR, "data", "security_json.json")
+
+with open(SECURITY_PATH) as f:
+    SECURITY_DATA = json.load(f)
+
+
+def security_score(event):
+    city = event.get('city')
+    county = CITY_TO_COUNTY.get(city)
+
+    if not county:
+        return 0.5
+    
+    return SECURITY_DATA.get(county, 0.5)
+

@@ -87,7 +87,7 @@ def tm_to_internal_event(tm_event: dict, user_city) -> dict:
     venues = tm_event.get("_embedded", {}).get("venues", [])
     venue = venues[0] if venues else {}
 
-    city = (venue.get("city") or {}).get("name", "Unknown")
+    county = city_to_county_map.get(city)
     venue_name = venue.get("name", "Unknown Venue")
     date = (tm_event.get("dates", {}).get("start") or {}).get("localDate")  # YYYY-MM-DD
 
