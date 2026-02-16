@@ -86,28 +86,36 @@ def tm_to_internal_event(tm_event: dict, user_city) -> dict:
     """
     venues = tm_event.get("_embedded", {}).get("venues", [])
     venue = venues[0] if venues else {}
+    city = (venue.get('city', {}) or {}).get('name') or ''
+    city = city.strip()
 
-    county = city_to_county_map.get(city)
     venue_name = venue.get("name", "Unknown Venue")
-    date = (tm_event.get("dates", {}).get("start") or {}).get("localDate")  # YYYY-MM-DD
+    event_date = (tm_event.get("dates", {}).get("start") or {})
 
     images = tm_event.get("images", []) or []
     poster_url = images[0].get("url") if images else None
     price_min, price_max, currency =extract_price_min_max_currency(tm_event)
-    travel_hours = get_travel_hours_mapbox(user_city, city)
+    travel_hours = get_travel_hours_mapbox(user_city, city) if user_city and city else None
 
+    start_info = (tm_event.get('dates', {}).get('start') or {})
+    local_date = start_info.get('localDate')
+    local_time = start_info.get('localTime')
+
+    if local_date and local_time:
+        event_date = f"{local_date} {local_time}"
+    else:
+        event_date = local_date or "TBA"
     # Defaults (later replace with questionnaire/user input)
     return {
         "city": city,
         "time": 7,
         "money": price_min,
-        "travel_hours": travel_hours,
-        "security": 6,
-        "level_of_affection_towards_artists": 7,
-        "frequency_of_holding_concerts": 2,
+        "travel_hours": travel_hours if travel_hours is not None else 10,
+        "level_of_affection_towards_artists": None,
+        "frequency_of_holding_concerts": None,
 
         # extra fields for display
-        "date": date,
+        "date": event_date,
         "venue": venue_name,
         "ticketmaster_url": tm_event.get("url"),
         "poster_url": poster_url,
