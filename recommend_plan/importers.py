@@ -3,6 +3,7 @@ import requests
 import math
 from datetime import date, datetime
 from .maps import get_travel_hours_mapbox
+from .utils import security_score
 
 TM_EVENTS_URL = "https://app.ticketmaster.com/discovery/v2/events.json"
 
@@ -112,6 +113,7 @@ def tm_to_internal_event(tm_event: dict, user_city) -> dict:
         "money": price_min,
         "travel_hours": travel_hours if travel_hours is not None else 10,
         "level_of_affection_towards_artists": None,
+        'security':security_score({"city": city}),
         "frequency_of_holding_concerts": None,
 
         # extra fields for display

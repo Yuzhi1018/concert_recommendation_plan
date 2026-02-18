@@ -123,8 +123,6 @@ except FileNotFoundError:
 def security_score(event):
     city = (event.get('city') or "").strip()
     return float(SECURITY_CITY.get(city, 0.5))
-    import json
-import os
 
 default_weights={
     'time_score'  : 1,
@@ -178,7 +176,7 @@ def compute_components(event, budget, time_budget_hours):
 
         'money_score': money_score,
 
-        'security_score': event['security'] / 10,
+        'security_score': float(event.get('security', 0.5)),
 
         'affection_score' : event['level_of_affection_towards_artists'] / 10,
 
@@ -245,7 +243,6 @@ except FileNotFoundError:
 def security_score(event):
     city = (event.get('city') or "").strip()
     return float(SECURITY_CITY.get(city, 0.5))
-    import json
 import os
 
 default_weights={
@@ -303,9 +300,9 @@ def compute_components(event, budget, time_budget_hours):
 
         'security_score': security_score(event),
 
-        'affection_score' : event['level_of_affection_towards_artists'] / 10,
+        'affection_score' : float(event.get('level_of_affection_towards_artists') or 7) / 10.0,
 
-        'rarity_score' : 1 / (1 + event['frequency_of_holding_concerts']),
+        'rarity_score' : 1.0 / (1.0 + float(event.get('frequency_of_holding_concerts') or 2.0)),
     }
 
     return scores
@@ -326,16 +323,19 @@ def explain_event(event, budget=400, weights=None, top_n=2, time_budget_hours=8.
     
     scores = compute_components(event, budget=budget, time_budget_hours=time_budget_hours)
     contributions = {k: weights.get(k,0) * scores[k] for k in scores}
-
     top_factors = sorted(contributions.items(), key=lambda x: x[1], reverse=True)[:top_n]
-    return [templates.get(k,k) for k, _ in top_factors]
-    
+
+    reasons = [templates.get(k,k) for k, _ in top_factors]
+
     if event.get('rarity_score', 0) >= 0.75:
         n = event.get('city_event_count', None)
     if n:
         reasons.append(f"Rarity: Only {n} show(s) in {event['city']} for this tour.")
     else:
-        reasons.append("Rarity: Limited shows in this city.")    
+        reasons.append("Rarity: Limited shows in this city.")   
+    
+    return [templates.get(k,k) for k, _ in top_factors]
+
 
 def rank_events(events, budget=400, time_budget_hours= 8.0, weights=None, k=2):
     if weights is None:

@@ -19,6 +19,7 @@ def index(request):
     time_budget_hours= 8.0
     no_recent_tour =False
     user_city=""
+    affection=7
 
     if request.method =="POST":
         
@@ -36,7 +37,7 @@ def index(request):
         
         affection = int(affection_raw) if affection_raw.isdigit() else 7
 
-        affection_score = affection/10.0
+        affection = max(1, min(10,affection))
 
         try:
             time_budget_hours=float(time_raw) if time_raw else 8.0
@@ -46,6 +47,9 @@ def index(request):
         tm_events = fetch_tm_events_by_keyword(artist)
 
         events = [tm_to_internal_event(e, user_city) for e in tm_events]
+
+        for e in events:
+            e['level_of_affection_towards_artists'] = affection
 
         city_counts = Counter(e.get('city') for e in events if e.get('city'))
 
@@ -83,7 +87,8 @@ def index(request):
         'budget': budget,
         'time_budget_hours': time_budget_hours,
         'no_recent_tour': no_recent_tour,
-        'user_city': user_city
+        'user_city': user_city,
+        'affection': affection
     })
 
 def search_concerts(request):
