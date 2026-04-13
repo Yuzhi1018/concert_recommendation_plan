@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .class-cart { @apply px-6 mt-4 flex items-center justify-between; }
+  .label-cart { @apply text-base font-medium text-slate-700; }
+  .span-cart { @apply  text-sm text-slate-600; }
+  .btn-primary { @apply mt-6 w-full rounded-2xl 
+         bg-slate-900 
+         px-6 py-4 
+         text-xl font-semibold text-white 
+         shadow-md
+         hover:bg-slate-800 
+         transition duration-200; }
+}

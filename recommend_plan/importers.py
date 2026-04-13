@@ -11,8 +11,12 @@ def fetch_attraction_id(artist: str, TICKETMASTER_API_KEY):
     url = "https://app.ticketmaster.com/discovery/v2/attractions.json"
     params = {
         "keyword": artist,
-        'apikey': TICKETMASTER_API_KEY
+        'apikey': TICKETMASTER_API_KEY,
+        'classificationName':'music',
+        'size': 50,
+        'sort': 'date,asc',
     }
+
     r= requests.get(url, params=params)
     data= r.json()
 
@@ -22,6 +26,26 @@ def fetch_attraction_id(artist: str, TICKETMASTER_API_KEY):
     
     return attractions[0]['id']
 
+def match_artist(event, artist):
+    attractions = event.get('_embedded', {}).get('attractions', [])
+    artist = artist.lower()
+
+    for a in attractions:
+        if artist in a.get('name', '').lower():
+            return True
+    return False
+
+def is_valid_event(event):
+    name = event.get('name', '').lower()
+
+    return not any(word in name for word in [
+        'tribute',
+        'party',
+        'karaoke',
+        'night',
+        'vs',
+        'dj'
+    ])
 
 def fetch_tm_events_by_keyword(keyword: str, country_code: str = "US", size: int = 10):
     """
@@ -44,7 +68,16 @@ def fetch_tm_events_by_keyword(keyword: str, country_code: str = "US", size: int
     r = requests.get(TM_EVENTS_URL, params=params, timeout=15)
     r.raise_for_status()
     data = r.json()
-    return data.get("_embedded", {}).get("events", [])
+    tm_events = data.get('_embedded', {}).get('events', [])
+
+    filtered_events =[]
+    for e in tm_events:
+        if match_artist(e, keyword) and is_valid_event(e):
+            filtered_events.append(e)
+
+    return filtered_events
+
+    
 
 def extract_price_min_max_currency(tm_event: dict):
     """"
@@ -123,3 +156,6 @@ def tm_to_internal_event(tm_event: dict, user_city) -> dict:
         "poster_url": poster_url,
         "event_name": tm_event.get("name"),
     }
+
+
+

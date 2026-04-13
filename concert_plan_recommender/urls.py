@@ -16,9 +16,17 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.contrib.auth import views as auth_views
+from recommend_plan.views import signup_view
+from recommend_plan.views import weights_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('recommend_plan.urls')),
-    path('api/', include('recommend_plan.urls')),
+    path('signup/', signup_view, name='signup'),
+    path('login/', auth_views.LoginView.as_view(
+        template_name='recommend_plan/login.html'
+    ), name='login'),
+    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    path('weights/', weights_view, name='weights')
 ]

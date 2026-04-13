@@ -1,0 +1,57 @@
+{% extends "recommend_plan/base.html" %}
+
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center px-6 py-12 bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100">
+
+  <div class="w-full max-w-3xl bg-white/90 backdrop-blur-sm rounded-[28px] shadow-[0_10px_40px_rgba(99,102,241,0.08)] border border-white/60 p-8 sm:p-10">
+
+    <div class="mb-8">
+      <p class="text-sm font-medium tracking-[0.18em] uppercase text-indigo-500">
+        Personalization
+      </p>
+      <h1 class="mt-3 text-4xl font-bold tracking-tight text-slate-800">
+        Set Your Concert Preferences
+      </h1>
+      <p class="mt-3 text-base text-slate-500 leading-7">
+        Adjust how much each factor should influence your concert recommendations.
+      </p>
+    </div>
+
+    <form method="post" class="space-y-7">
+      {% csrf_token %}
+
+      {% for label, name in factors %}
+      <div class="rounded-2xl bg-slate-50/80 border border-slate-200/70 px-5 py-5">
+        <div class="flex justify-between items-center mb-3">
+          <span class="text-[15px] font-semibold text-slate-700">
+            {{ label }}
+          </span>
+          <span id="{{ name }}_value" class="inline-flex items-center justify-center min-w-[2rem] h-8 px-3 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold">
+            3
+          </span>
+        </div>
+
+        <input
+          type="range"
+          name="{{ name }}"
+          min="1"
+          max="5"
+          value="3"
+          class="w-full h-2 cursor-pointer accent-indigo-500"
+          oninput="document.getElementById('{{ name }}_value').innerText = this.value"
+        >
+      </div>
+      {% endfor %}
+
+      <div class="pt-3">
+        <button
+          type="submit"
+          class="w-full rounded-2xl bg-indigo-600 py-3.5 text-white font-semibold shadow-md shadow-indigo-200 hover:bg-indigo-700 transition"
+        >
+          Save Preferences
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

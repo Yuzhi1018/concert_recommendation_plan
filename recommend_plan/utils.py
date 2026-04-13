@@ -19,17 +19,30 @@ templates={
     "rarity_score": "This is a relatively rare opportunity",
 }
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SECURITY_PATH = os.path.join(BASE_DIR, "data", "security_city.json")
+
+try:
+    with open(SECURITY_PATH, 'r', encoding='utf-8') as f:
+        SECURITY_CITY = json.load(f)
+except FileNotFoundError:
+    SECURITY_CITY = {}
+
+def security_score(event):
+    city = (event.get('city') or '').strip()
+    return float(SECURITY_CITY.get(city, 0.5))
+
 def time_score(event, time_budget_hours: float):
     total = (event.get('travel_hours') or 0) + (event.get('event_duration_hours') or 0)
 
     if time_budget_hours<=0:
-        return 0
+        return 0.0
     
     if total<= time_budget_hours:
-        return 1
+        return 1.0
     
     over = total-time_budget_hours
-    return max(0, 1 - over / time_budget_hours)
+    return max(0.0, 1.0 - over / time_budget_hours)
 
 def compute_components(event, budget, time_budget_hours):
     if isinstance(event, list):
@@ -39,28 +52,29 @@ def compute_components(event, budget, time_budget_hours):
 
     if price is None:
         money_score = 0.5
-    elif budget >= price:
+    elif budget > 0 and budget >= price:
         money_score = 1.0
+    elif budget>0:
+        money_score = max(0.0, 1.0 - (price-budget)/budget)
     else:
-        money_score = max(0.0, 1.0 - (price - budget) / budget)
+        money_score = 0.0
 
-    travel_hours = event.get('travel_hours', 10)
-    affection = event.get('level_of_affection_towards_artists', 5)
-    freq = event.get('frequency_of_holding_concerts', 3)
-    rarity_score = event.get('rarity_score', 0.5)
-
+    travel_hours =float(event.get('travel_hours') or 10.0)
+    affection = float(event.get('level_of_affection_towards_artists') or 5.0)
+    frequency = float(event.get('frequency_of_holding_concerts') or 3.0)
+    
     scores={
         'time_score': time_score(event, time_budget_hours),
 
-        'travel_score': max(0, 1 - event['travel_hours'] / 10),
+        'travel_score': max(0, 1.0 - travel_hours / 10.0),
 
         'money_score': money_score,
 
         'security_score': security_score(event),
 
-        'affection_score' : event['level_of_affection_towards_artists'] / 10,
+        'affection_score' : affection / 10.0,
 
-        'rarity_score' : 1 / (1 + event['frequency_of_holding_concerts']),
+        'rarity_score' : 1.0 / (1.0 + frequency),
     }
 
     return scores
@@ -71,26 +85,27 @@ def compute_score(event, budget=400, weights=None, time_budget_hours= 8.0):
 
     scores= compute_components(event, budget=budget, time_budget_hours=time_budget_hours)
 
-    total_score = sum(weights[k]*scores[k] for k in scores)
+    total_score = sum(weights.get(k, 0) * scores[k] for k in scores)
 
     return total_score
 
-def explain_event(event, budget=400, weights=None, top_n=2, time_budget_hours=8.0):
+def explain_event(event, top_n=2, budget=400, weights=None, time_budget_hours=8.0):
     if weights is None:
         weights = default_weights
     
     scores = compute_components(event, budget=budget, time_budget_hours=time_budget_hours)
     contributions = {k: weights.get(k,0) * scores[k] for k in scores}
-
     top_factors = sorted(contributions.items(), key=lambda x: x[1], reverse=True)[:top_n]
-    return [templates.get(k,k) for k, _ in top_factors]
+
+    reasons = [templates.get(k, k) for k, _ in top_factors]
     
     if event.get('rarity_score', 0) >= 0.75:
-        n = event.get('city_event_count', None)
-    if n:
-        reasons.append(f"Rarity: Only {n} show(s) in {event['city']} for this tour.")
-    else:
-        reasons.append("Rarity: Limited shows in this city.")    
+        n = event.get('city_event_count')
+        if n is not None:
+            reasons.append(f"Rarity: Only {n} show(s) in {event.get('city', 'this city')} for this tour.")
+        else:
+            reasons.append("Rarity: Limited shows in this city.") 
+    return reasons   
 
 def rank_events(events, budget=400, time_budget_hours= 8.0, weights=None, k=2):
     if weights is None:
@@ -110,264 +125,5 @@ def rank_events(events, budget=400, time_budget_hours= 8.0, weights=None, k=2):
             "reasons": explain_event(e, budget=budget, weights=weights, top_n=2),
         })
     return result
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SECURITY_PATH = os.path.join(BASE_DIR, "data", "security_city.json")
-
-try:
-    with open(SECURITY_PATH, 'r', encoding='utf-8') as f:
-        SECURITY_CITY = json.load(f)
-except FileNotFoundError:
-    SECURITY_CITY={}
-
-def security_score(event):
-    city = (event.get('city') or "").strip()
-    return float(SECURITY_CITY.get(city, 0.5))
-
-default_weights={
-    'time_score'  : 1,
-    'travel_score'  : 2,
-    'money_score' : 2,
-    'security_score': 1,
-    'affection_score' : 3,
-    'rarity_score' : 1,
-}
-
-templates={
-    "money_score": "This session fits your budget well",
-    "time_score": "The timing works well for you",
-    "travel_score": "Travel time is relatively short",
-    "security_score": "The city feels relatively safe",
-    "affection_score": "You really like this artist",
-    "rarity_score": "This is a relatively rare opportunity",
-}
-
-def time_score(event, time_budget_hours: float):
-    total = (event.get('travel_hours') or 0) + (event.get('event_duration_hours') or 0)
-
-    if time_budget_hours<=0:
-        return 0
-    
-    if total<= time_budget_hours:
-        return 1
-    
-    over = total-time_budget_hours
-    return max(0, 1 - over / time_budget_hours)
-
-def compute_components(event, budget, time_budget_hours):
-    if isinstance(event, list):
-        event =event[0]
-
-    price = event.get('money')
-
-    if price is None:
-        money_score = 0.5
-    elif budget >= price:
-        money_score = 1.0
-    else:
-        money_score = max(0.0, 1.0 - (price - budget) / budget)
-
-    rarity_score = event.get('rarity_score', 0.5)
-
-    scores={
-        'time_score': time_score(event, time_budget_hours),
-
-        'travel_score': max(0, 1 - event['travel_hours'] / 10),
-
-        'money_score': money_score,
-
-        'security_score': float(event.get('security', 0.5)),
-
-        'affection_score' : event['level_of_affection_towards_artists'] / 10,
-
-        'rarity_score' : 1 / (1 + event['frequency_of_holding_concerts']),
-    }
-
-    return scores
-
-def compute_score(event, budget=400, weights=None, time_budget_hours= 8.0):
-    if weights is None:
-        weights = default_weights
-
-    scores= compute_components(event, budget=budget, time_budget_hours=time_budget_hours)
-
-    total_score = sum(weights[k]*scores[k] for k in scores)
-
-    return total_score
-
-def explain_event(event, budget=400, weights=None, top_n=2, time_budget_hours=8.0):
-    if weights is None:
-        weights = default_weights
-    
-    scores = compute_components(event, budget=budget, time_budget_hours=time_budget_hours)
-    contributions = {k: weights.get(k,0) * scores[k] for k in scores}
-
-    top_factors = sorted(contributions.items(), key=lambda x: x[1], reverse=True)[:top_n]
-    return [templates.get(k,k) for k, _ in top_factors]
-    
-    if event.get('rarity_score', 0) >= 0.75:
-        n = event.get('city_event_count', None)
-    if n:
-        reasons.append(f"Rarity: Only {n} show(s) in {event['city']} for this tour.")
-    else:
-        reasons.append("Rarity: Limited shows in this city.")    
-
-def rank_events(events, budget=400, time_budget_hours= 8.0, weights=None, k=2):
-    if weights is None:
-        weights = default_weights
-
-    if isinstance(events, dict):
-        events = [events]
-
-    scored = [(e, compute_score(e, budget=budget, time_budget_hours=time_budget_hours, weights=weights)) for e in events]
-    scored.sort(key=lambda x: x[1], reverse=True)
-
-    result = []
-    for e, total in scored[:k]:
-        result.append({
-            "event": e,
-            "score": total,
-            "reasons": explain_event(e, budget=budget, weights=weights, top_n=2),
-        })
-    return result
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SECURITY_PATH = os.path.join(BASE_DIR, "data", "security_city.json")
-
-try:
-    with open(SECURITY_PATH, 'r', encoding='utf-8') as f:
-        SECURITY_CITY = json.load(f)
-except FileNotFoundError:
-    SECURITY_CITY={}
-
-def security_score(event):
-    city = (event.get('city') or "").strip()
-    return float(SECURITY_CITY.get(city, 0.5))
-import os
-
-default_weights={
-    'time_score'  : 1,
-    'travel_score'  : 2,
-    'money_score' : 2,
-    'security_score': 1,
-    'affection_score' : 3,
-    'rarity_score' : 1,
-}
-
-templates={
-    "money_score": "This session fits your budget well",
-    "time_score": "The timing works well for you",
-    "travel_score": "Travel time is relatively short",
-    "security_score": "The city feels relatively safe",
-    "affection_score": "You really like this artist",
-    "rarity_score": "This is a relatively rare opportunity",
-}
-
-def time_score(event, time_budget_hours: float):
-    total = (event.get('travel_hours') or 0) + (event.get('event_duration_hours') or 0)
-
-    if time_budget_hours<=0:
-        return 0
-    
-    if total<= time_budget_hours:
-        return 1
-    
-    over = total-time_budget_hours
-    return max(0, 1 - over / time_budget_hours)
-
-def compute_components(event, budget, time_budget_hours):
-    if isinstance(event, list):
-        event =event[0]
-
-    price = event.get('money')
-
-    if price is None:
-        money_score = 0.5
-    elif budget >= price:
-        money_score = 1.0
-    else:
-        money_score = max(0.0, 1.0 - (price - budget) / budget)
-
-    rarity_score = event.get('rarity_score', 0.5)
-    affection = event.get('level_of_affection_towards_artists')
-    affection = 7 if affection is None else affection
-    scores={
-        'time_score': time_score(event, time_budget_hours),
-
-        'travel_score': max(0, 1 - event['travel_hours'] / 10),
-
-        'money_score': money_score,
-
-        'security_score': security_score(event),
-
-        'affection_score' : float(event.get('level_of_affection_towards_artists') or 7) / 10.0,
-
-        'rarity_score' : 1.0 / (1.0 + float(event.get('frequency_of_holding_concerts') or 2.0)),
-    }
-
-    return scores
-
-def compute_score(event, budget=400, weights=None, time_budget_hours= 8.0):
-    if weights is None:
-        weights = default_weights
-
-    scores= compute_components(event, budget=budget, time_budget_hours=time_budget_hours)
-
-    total_score = sum(weights[k]*scores[k] for k in scores)
-
-    return total_score
-
-def explain_event(event, budget=400, weights=None, top_n=2, time_budget_hours=8.0):
-    if weights is None:
-        weights = default_weights
-    
-    scores = compute_components(event, budget=budget, time_budget_hours=time_budget_hours)
-    contributions = {k: weights.get(k,0) * scores[k] for k in scores}
-    top_factors = sorted(contributions.items(), key=lambda x: x[1], reverse=True)[:top_n]
-
-    reasons = [templates.get(k,k) for k, _ in top_factors]
-
-    if event.get('rarity_score', 0) >= 0.75:
-        n = event.get('city_event_count', None)
-    if n:
-        reasons.append(f"Rarity: Only {n} show(s) in {event['city']} for this tour.")
-    else:
-        reasons.append("Rarity: Limited shows in this city.")   
-    
-    return [templates.get(k,k) for k, _ in top_factors]
-
-
-def rank_events(events, budget=400, time_budget_hours= 8.0, weights=None, k=2):
-    if weights is None:
-        weights = default_weights
-
-    if isinstance(events, dict):
-        events = [events]
-
-    scored = [(e, compute_score(e, budget=budget, time_budget_hours=time_budget_hours, weights=weights)) for e in events]
-    scored.sort(key=lambda x: x[1], reverse=True)
-
-    result = []
-    for e, total in scored[:k]:
-        result.append({
-            "event": e,
-            "score": total,
-            "reasons": explain_event(e, budget=budget, weights=weights, top_n=2),
-        })
-    return result
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SECURITY_PATH = os.path.join(BASE_DIR, "data", "security_city.json")
-
-try:
-    with open(SECURITY_PATH, 'r', encoding='utf-8') as f:
-        SECURITY_CITY = json.load(f)
-except FileNotFoundError:
-    SECURITY_CITY={}
-
-def security_score(event):
-    city = (event.get('city') or "").strip()
-    return float(SECURITY_CITY.get(city, 0.5))
-
 
 

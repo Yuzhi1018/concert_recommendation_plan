@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Concert Travel Plan</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.10),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(15,23,42,0.08),_transparent_28%),linear-gradient(to_bottom_right,_#f8fafc,_#eef2ff)] text-slate-900">
+  <div class="mx-auto max-w-6xl px-4 py-10 lg:px-8">
+
+    <!-- Top Bar -->
+    <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">
+          AI-Powered Concert Planner
+        </p>
+        <h1 class="mt-2 text-4xl font-bold tracking-tight sm:text-5xl">
+          Your Personalized Travel Plan
+        </h1>
+        <p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">
+          A polished itinerary generated from your recommended concert, travel constraints,
+          and preference signals.
+        </p>
+      </div>
+
+      <div class="flex gap-3">
+        <a href="{% url 'recommend_plan:index' %}"
+           class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
+          ← Back
+        </a>
+
+        <button onclick="window.print()"
+          class="inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
+          Print
+        </button>
+      </div>
+    </div>
+
+    {% if plan %}
+    <div class="mx-auto max-w-4xl">
+
+      <!-- Main Content -->
+      <div class="overflow-hidden rounded-[28px] bg-white shadow-sm ring-1 ring-slate-200">
+        <div class="border-b border-slate-100 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-700 px-8 py-8 text-white">
+          <p class="text-sm font-medium text-indigo-100">OpenAI-generated plan</p>
+          <h2 class="mt-2 text-2xl font-bold sm:text-3xl">
+            Concert Travel Recommendation
+          </h2>
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-200">
+            Structured for readability, presentation, and product-style display.
+          </p>
+        </div>
+
+        <div class="px-6 py-6 sm:px-8 sm:py-8">
+          <div class="mb-5 flex flex-wrap gap-3">
+            <button id="copyBtn"
+              class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+              Copy plan
+            </button>
+            <span class="rounded-2xl bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700">
+              AI generated
+            </span>
+            <span class="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
+              Demo ready
+            </span>
+          </div>
+
+          <div id="planContainer"
+            class="rounded-[24px] border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-6 sm:p-8">
+          </div>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="rounded-[28px] bg-white p-12 text-center shadow-sm ring-1 ring-slate-200">
+      <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-2xl">
+        ✨
+      </div>
+      <h2 class="mt-5 text-2xl font-bold">No AI plan available yet</h2>
+      <p class="mt-2 text-slate-600">
+        Go back, choose a recommended concert, and generate a plan first.
+      </p>
+      <a href="{% url 'recommend_plan:index' %}"
+         class="mt-6 inline-flex rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800">
+        Back to recommender
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if plan %}
+  <script>
+    const rawPlan = `{{ plan|escapejs }}`;
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function formatInline(text) {
+      return text.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>');
+    }
+
+    function renderPlan(text) {
+      const lines = text.split("\n").map(line => line.trim()).filter(line => line.length > 0);
+
+      let html = '';
+      let inList = false;
+
+      for (let line of lines) {
+        let safe = escapeHtml(line);
+        safe = formatInline(safe);
+
+        if (safe.startsWith("#### ")) {
+          if (inList) {
+            html += '</ul>';
+            inList = false;
+          }
+          html += `<h3 class="mt-8 first:mt-0 text-2xl font-bold tracking-tight text-slate-900">${safe.replace("#### ", "")}</h3>`;
+        } else if (safe.startsWith("### ")) {
+          if (inList) {
+            html += '</ul>';
+            inList = false;
+          }
+          html += `<h2 class="mt-8 first:mt-0 text-3xl font-bold tracking-tight text-slate-900">${safe.replace("### ", "")}</h2>`;
+        } else if (safe.startsWith("- ")) {
+          if (!inList) {
+            html += `<ul class="mt-4 space-y-3">`;
+            inList = true;
+          }
+          html += `
+            <li class="flex gap-3 rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+              <div class="mt-1 h-2.5 w-2.5 flex-none rounded-full bg-indigo-500"></div>
+              <div class="text-[15px] leading-7 text-slate-700">${safe.replace("- ", "")}</div>
+            </li>
+          `;
+        } else {
+          if (inList) {
+            html += '</ul>';
+            inList = false;
+          }
+          html += `<p class="mt-4 text-[15px] leading-8 text-slate-700">${safe}</p>`;
+        }
+      }
+
+      if (inList) {
+        html += '</ul>';
+      }
+
+      return html;
+    }
+
+    const planContainer = document.getElementById("planContainer");
+    planContainer.innerHTML = renderPlan(rawPlan);
+
+    document.getElementById("copyBtn").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(rawPlan);
+        const btn = document.getElementById("copyBtn");
+        btn.textContent = "Copied!";
+        setTimeout(() => {
+          btn.textContent = "Copy plan";
+        }, 1500);
+      } catch (err) {
+        console.error("Copy failed", err);
+      }
+    });
+  </script>
+  {% endif %}
+</body>
+</html>
