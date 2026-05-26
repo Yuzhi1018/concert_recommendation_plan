@@ -18,7 +18,7 @@ class KMeansClusterer(BaseEstimator, TransformerMixin):
         self.random_state = random_state
         self.pipe_ = None
 
-    def fit(self, X, y=None):
+    def fit(self, X, y= None):
         self.pipe_ = Pipeline([
             ('imputer', SimpleImputer(strategy='median')),
             ("scaler", StandardScaler()),
